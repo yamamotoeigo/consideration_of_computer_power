@@ -1,0 +1,4 @@
+venv/
+src/data/
+src/make_initial_data/autoencoder_for_japanese_network.edgelist
+src/make_initial_data/japanese_network.edgelist

@@ -1,0 +1,16 @@
+networkx==2.8.8
+matplotlib
+numpy
+node2vec
+scikit-learn
+torch==1.13.1
+gensim
+pandas
+word2vec
+seaborn
+ipykernel
+jupyter
+torchvision
+gymnasium
+pyvirtualdisplay
+pfrl
