@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1447]:
+# In[972]:
 
 
 import networkx as nx
@@ -9,9 +9,10 @@ import pprint
 import random
 import matplotlib.pyplot as plt
 import numpy as np
+from collections import Counter
 
 
-# In[1448]:
+# In[973]:
 
 
 def generate_exchange_matrix(size: int, graph: nx.Graph) -> list:
@@ -44,7 +45,7 @@ def generate_exchange_matrix(size: int, graph: nx.Graph) -> list:
     return matrix
 
 
-# In[1449]:
+# In[974]:
 
 
 def generate_random_graph(num_nodes: int) -> nx.Graph:
@@ -69,7 +70,29 @@ def generate_random_graph(num_nodes: int) -> nx.Graph:
     return G
 
 
-# In[1450]:
+# In[975]:
+
+
+def generate_block_structure(row, col):
+    """ニューラルネットワークの構造を表す行列を生成する
+
+    Args:
+        row (_type_): 行
+        col (_type_): 列
+
+    Returns:
+        _type_: ニューラルネットワークの構造を表す行列
+        
+    Example:
+        row = 2, col = 3
+        [[0, 2, 4],
+        [1, 3, 5]]
+    """    
+    matrix = [[j * row + i for j in range(col)] for i in range(row)]
+    return np.array(matrix)
+
+
+# In[976]:
 
 
 def weightintg_graph(graph: nx.Graph, exchange_matrix: list):
@@ -88,7 +111,7 @@ def weightintg_graph(graph: nx.Graph, exchange_matrix: list):
                 graph.add_edge(i, j, weight=exchange_matrix[i][j])
 
 
-# In[1451]:
+# In[977]:
 
 
 def create_block_matrix(num_rows: int, num_cols: int) -> list:
@@ -172,7 +195,7 @@ def create_block_matrix(num_rows: int, num_cols: int) -> list:
     return matrix
 
 
-# In[1452]:
+# In[978]:
 
 
 def generate_block_list(num_blocks: int) -> list:
@@ -196,29 +219,159 @@ def generate_block_list(num_blocks: int) -> list:
     return block_list
 
 
-# In[1453]:
+# In[979]:
 
 
-def generate_assignment_matrix(num_pcs: int, num_blocks: int) -> list:
-    values = []
-    base_counts = num_blocks // num_pcs  # 基準となる個数
-    remaining = num_blocks % num_pcs  # 残りの個数
+def generate_pc_capacity_list(num_pcs: int, num_blocks: int) -> list:
+    """計算機のキャパシティを表すリストを作成
+    
+    足し合わせるとnum_
 
-    # 基準となる個数での乱数生成
-    for pc in range(num_pcs):
-        values.extend([pc] * base_counts)
+    Args:
+        pc_nums (int): 計算機の数
 
-    # 残りの個数を等しい比率で乱数生成
-    remaining_values = random.choices(range(num_pcs), k=remaining)
-    values.extend(remaining_values)
+    Returns:
+        list: 計算機の処理できるブロック数のリスト
+        
+    Exapmle:
+        pc_nums = 4の場合
+        Capacities = [1, 3, 2, 5]
+        C[0] = 1, C[1] = 3, C[2] = 2, C[3] = 5
+        PC1の処理できるブロック数は1
+        PC2の処理できるブロック数は3
+    """
+    capacities = []
+
+    for _ in range(num_pcs - 1):
+        num = random.randint(1, num_blocks//2)
+        capacities.append(num)
+        num_blocks -= num
+
+
+    capacities.append(random.randint(num_blocks, num_blocks+3))
+
+    return capacities
+
+
+# In[980]:
+
+
+def generate_random_assignment(num_pcs: int, num_blocks: int, capacities: list) -> list:
+    """各ブロックを担当する計算機をランダムに割り当てたリスト
+
+    Args:
+        num_pcs (int): 計算機の数
+        num_blocks (int): ブロックの数
+        capacities (list): 各計算機のキャパシティ
+
+    Returns:
+        list: ブロックを担当する計算機のリスト
+        
+    Example:
+        [2, 0, 0, 3, 3, 0, 1, 3, 3, 3, 1, 2]
+        
+        -> ブロック0はPC2が担当
+        -> ブロック1はPC0が担当
+    """
+    assignment = []
+    counts = Counter()
+
+    # キャパシティごとの最大割り当て可能数を計算
+    max_counts = {pc: min(num_blocks, capacity) for pc, capacity in enumerate(capacities)}
+
+    # 割り当てる要素をランダムに選びながら、キャパシティを超えないように制限
+    for _ in range(num_blocks):
+        available_pcs = [pc for pc in range(num_pcs) if counts[pc] < max_counts[pc]]
+        selected_pc = random.choice(available_pcs)
+        assignment.append(selected_pc)
+        counts[selected_pc] += 1
 
     # 乱数をシャッフル
-    random.shuffle(values)
+    random.shuffle(assignment)
 
-    return values
+    return assignment
 
 
-# In[1454]:
+# In[981]:
+
+
+def find_max_index(lst):
+    max_value = max(lst)  # リスト内の最大値を取得
+    max_index = lst.index(max_value)  # 最大値の添字を取得
+    return max_value, max_index
+
+
+# In[982]:
+
+
+def get_positive_min(lst: list, used_pcs: list) -> int:
+    """リストから0より大きい最小値を取得
+
+    Args:
+        lst (_type_): 探索対象のリスト
+
+    Returns:
+        _type_: 最小値
+    """
+    positive_values = [(i, x) for i, x in enumerate(lst) if x > 0 and i not in used_pcs]
+    if positive_values:
+        sorted_values = sorted(positive_values, key=lambda x: x[1])
+        min_index, _ = sorted_values[0]
+        return min_index
+    else:
+        return None
+
+
+# In[983]:
+
+
+def generate_greedy_assignment(num_pcs: int, num_blocks: int, capacities: list, exchange_matrix: list) -> list:
+    """グリーディーに割り当てを実施する
+
+    Args:
+        num_pcs (int): 計算機の第数
+        num_blocks (int): ブロックの数
+        capacities (list): 計算機のキャかシティ
+        exchange_matrix (list): 交流行列
+
+    Returns:
+        list: 割り当て結果
+    """    
+    assignment = [-1] * num_blocks  # 割り当てを表すリスト
+    used_pcs = []  # 割り当て済み(使用済み)の計算機のリスト
+
+    # 1. キャパの一番大きいPCを探す
+    max_capacity = max(capacities)
+    initial_pc = capacities.index(max_capacity)
+    used_pcs.append(initial_pc)  # 最大キャパシティの計算機を使用済みリストに追加
+
+    # 2. (1)のPCを始点としてキャパ分のブロックを割り当てる
+    for i in range(max_capacity):
+        assignment[i] = initial_pc
+
+    count = max_capacity  # 割り当て済みのブロック数
+
+    # 3. 4. をすべてのブロックをなくなるまで繰り返す
+    while count < num_blocks:
+        next_pc = get_positive_min(exchange_matrix[initial_pc], used_pcs=used_pcs)  # 通信コストが低いPC
+        if next_pc is None:
+            # 計算機の探索が不可能な場合、未使用のPCの中で最大の容量を持つPCを現在のPCとする
+            remaining_pcs = set(range(num_pcs)) - set(used_pcs)
+            next_pc = max(remaining_pcs, key=lambda pc: capacities[pc])
+
+        used_pcs.append(next_pc)  # 使用済みリストに追加
+
+        # 4. (3)のPCにブロックをキャパ分、割り当てる
+        for i in range(capacities[next_pc]):
+            if count >= num_blocks:
+                break
+            assignment[count] = next_pc
+            count += 1
+
+    return assignment
+
+
+# In[984]:
 
 
 def get_pc_by_block_label(block_label: int, assigned_matrix: list) -> int:
@@ -238,7 +391,7 @@ def get_pc_by_block_label(block_label: int, assigned_matrix: list) -> int:
     
 
 
-# In[1455]:
+# In[985]:
 
 
 def get_tasks_by_pc(pc: int, assigned_matrix: list) -> int:
@@ -258,27 +411,7 @@ def get_tasks_by_pc(pc: int, assigned_matrix: list) -> int:
     return tasks
 
 
-# In[1456]:
-
-
-# def get_linked_blocks(block_label: int, block_linked_matrix: list) -> list:
-#     """ブロックのラベルから接続しているブロックのラベルのリストを返す
-
-#     Args:
-#         block_labe (int): ブロックのラベル
-#         matrix (list): 接続関係を持つ行列
-
-#     Returns:
-#         list: 接続しているブロックのラベルのリスト
-#     """
-#     linked_blocks = []
-#     for i in range(len(block_linked_matrix)):
-#         if block_linked_matrix[block_label][i] == 1:
-#             linked_blocks.append(i)
-#     return linked_blocks
-
-
-# In[1457]:
+# In[986]:
 
 
 def generate_linked_block_list(matrix: list) -> list:
@@ -309,10 +442,10 @@ def generate_linked_block_list(matrix: list) -> list:
     return result
 
 
-# In[1458]:
+# In[987]:
 
 
-def evaluate_communication_cost(block_list: list, assigned_matrix: list, linked_blocks: list) -> float:
+def evaluate_communication_cost(block_list: list, assigned_matrix: list, linked_blocks: list, G) -> float:
     """割り当て結果から順伝播させた時の通信コストを計算する
 
     Args:
@@ -347,8 +480,7 @@ def evaluate_communication_cost(block_list: list, assigned_matrix: list, linked_
         # 総通信コストを計算
         temp_cost = 0
         for target in target_pcs:
-            path = nx.dijkstra_path(G, 0, target)
-            length = nx.dijkstra_path_length(G, 0, target)
+            length = nx.dijkstra_path_length(G, initial_pc, target)
             # print(length)
             temp_cost += length
         total_cost += temp_cost
@@ -357,14 +489,17 @@ def evaluate_communication_cost(block_list: list, assigned_matrix: list, linked_
     return total_cost
 
 
-# In[1459]:
+# In[988]:
 
 
 # ネットワークトポロジーを作成
-G = generate_random_graph(4)
+num_pcs = 4
+num_blocks = 12
 
+G = generate_random_graph(num_pcs)
 # 交流行列を作成
-exchange_matrix = generate_exchange_matrix(size=4, graph=G)
+exchange_matrix = generate_exchange_matrix(size=num_pcs, graph=G)
+capacities = generate_pc_capacity_list(num_pcs=num_pcs, num_blocks=num_blocks)
 
 # グラフのエッジに通信コスト(交流行列より)を付与
 weightintg_graph(G, exchange_matrix)
@@ -377,13 +512,11 @@ edge_labels = nx.get_edge_attributes(G, 'weight')
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_color='red')
 
 # ニューラルネットワークを分割したブロック
-block_structure = np.array([[0, 2, 4],
-                            [1, 3, 5]])
+block_structure = generate_block_structure(row=2, col=6)
+print(f'ニューラルネットワークの構造を表した行列:\n{block_structure}\n')
 
 # 通信する必要のあるブロックのリストを作成
 linked_blocks = generate_linked_block_list(block_structure)
-num_pcs = 4
-num_blocks = 6
 
 
 print("交流行列")
@@ -398,31 +531,47 @@ print("\n分割ブロックの番号リスト")
 print(block_list)
 
 # Distribute tasks to computers
-assigned_matrix = generate_assignment_matrix(num_pcs, num_blocks)
+random_assigned_matrix = generate_random_assignment(num_pcs=num_pcs, num_blocks=num_blocks, capacities=capacities)
+greedy_assigned_matrix = generate_greedy_assignment(num_pcs=num_pcs, num_blocks=num_blocks, capacities=capacities, exchange_matrix=exchange_matrix)
+print("計算機のキャパシティを表すリスト")
+print(capacities)
 print("\nPCが担当するブロックの割り当てを表す行列")
-print(f'Group = {assigned_matrix}')
+print(f'Group = {random_assigned_matrix}')
+print(f'Group = {greedy_assigned_matrix}')
 
 
-# In[1460]:
+# In[989]:
 
 
 print(f'\n各ブロックが結果を送信する必要のあるブロック:\nB = {linked_blocks}\n')
-print(f'ニューロンを担当する計算機:\nG = {assigned_matrix}')
+print(f'ニューロンを担当する計算機:\nG = {random_assigned_matrix}')
 for block_label in range(num_blocks):
-    pc = get_pc_by_block_label(block_label, assigned_matrix=assigned_matrix)
+    pc = get_pc_by_block_label(block_label, assigned_matrix=random_assigned_matrix)
     print(f'\nブロック{block_label}を担当するPCの番号: {pc}')
     # linked_blocks = linked_blocks[block_label]
     print(f'ブロック{block_label}の送信対象のブロックの番号リスト: {linked_blocks[block_label]}')
 
 
-# In[1461]:
+# In[990]:
 
 
-print(f'\n各ブロックが結果を送信する必要のあるブロック:\nB = {linked_blocks}')
-print(f'ニューロンを担当する計算機:\nGroup = {assigned_matrix}\n')
+print(f'PCのキャパシティ:\n {capacities}\n')
 
-total_cost = evaluate_communication_cost(block_list=block_list, linked_blocks=linked_blocks, assigned_matrix=assigned_matrix)
-print(f'総通信コスト: {total_cost}')
+random_total_cost = evaluate_communication_cost(block_list=block_list, linked_blocks=linked_blocks, assigned_matrix=random_assigned_matrix, G=G)
+print(f'ランダムに割り当て:\n{random_assigned_matrix}')
+print(f'ランダムに割り当てた場合の総通信コスト: {random_total_cost}\n')
+
+greedy_total_cost = evaluate_communication_cost(block_list=block_list, linked_blocks=linked_blocks, assigned_matrix=greedy_assigned_matrix, G=G)
+print(f'グリーディーに割り当て:\n{greedy_assigned_matrix}')
+print(f'グリーディーに割り当てた場合の総通信コスト: {greedy_total_cost}')
+
+
+# In[991]:
+
+
+greedy_total_cost = evaluate_communication_cost(block_list=block_list, linked_blocks=linked_blocks, assigned_matrix=greedy_assigned_matrix, G=G)
+print(f'グリーディーに割り当て:\n{greedy_assigned_matrix}')
+print(f'グリーディーに割り当てた場合の総通信コスト: {greedy_total_cost}')
 
 
 # 
