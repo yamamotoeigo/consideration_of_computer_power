@@ -241,14 +241,22 @@ def generate_pc_capacity_list(num_pcs: int, num_blocks: int) -> list:
         PC2の処理できるブロック数は3
     """
     capacities = []
+    num_blocks_copy = num_blocks
 
-    for _ in range(num_pcs - 1):
-        num = random.randint(1, num_blocks//2)
-        capacities.append(num)
-        num_blocks -= num
+    if num_pcs >= num_blocks:
+        capacity = num_blocks // num_pcs
+        remainder = num_blocks % num_pcs
+        capacities.extend([capacity] * num_pcs)
+        capacities[:remainder] = [x + 1 for x in capacities[:remainder]]
+    else:
+        remaining_blocks = num_blocks
 
-
-    capacities.append(random.randint(num_blocks, num_blocks+3))
+        for _ in range(num_pcs - 1):
+            max_capacity = remaining_blocks - (num_pcs - len(capacities) - 1)
+            num = random.randint(1, min(max_capacity, remaining_blocks // 2))
+            capacities.append(num)
+            remaining_blocks -= num
+        capacities.append(remaining_blocks)
 
     return capacities
 
