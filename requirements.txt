@@ -14,3 +14,5 @@ torchvision
 gymnasium
 pyvirtualdisplay
 pfrl
+simanneal
+deap
